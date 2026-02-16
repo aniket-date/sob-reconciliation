@@ -1,6 +1,6 @@
 
-import { reconciliationScenarios } from './mastra/references/reconciliation-logic.js';
-import { compareData, scenarios } from './mastra/tools/reconciliation-logic-helper.js';
+import { reconciliationScenarios } from './mastra/scripts/reconciliation-logic.js';
+import { compareData, scenarios } from './mastra/scripts/reconciliation-logic-helper.js';
 
 console.log('--- Verifying Scenarios ---');
 console.log(`Loaded scenarios from reference: ${reconciliationScenarios.length}`);

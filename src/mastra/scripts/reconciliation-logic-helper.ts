@@ -1,4 +1,4 @@
-import { reconciliationScenarios, type Scenario, type Mapping } from '../references/reconciliation-logic.js';
+import { reconciliationScenarios, type Scenario, type Mapping } from './reconciliation-logic.js';
 
 export { Scenario, Mapping };
 

@@ -1,7 +1,7 @@
 import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
 
-import { compareData } from './reconciliation-logic-helper.js';
+import { compareData } from '../scripts/reconciliation-logic-helper.js';
 
 export const reconciliationTool = createTool({
     id: 'reconciliation-tool',
