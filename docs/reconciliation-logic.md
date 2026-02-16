@@ -48,6 +48,67 @@ This document defines the rules for comparing data between HotWax OMS (captured 
 ## Common Transforms
 - **stripGid**: Extracts the numeric ID from a Shopify Global ID (e.g., `gid://shopify/Order/12345` -> `12345`).
 
+## Generic Mappings
+
+The system supports global mappings that act as defaults if a scenario does not explicitly define them.
+
+### Global Field Mappings
+These map common OMS field names to their Shopify counterparts:
+- `orderName` -> `name`
+- `externalId` -> `id`
+- `statusId` -> `displayFulfillmentStatus`
+- `shopifyOrderId` -> `legacyResourceId`
+- `orderDate`, `entryDate`, `createdDate`, `fromDate` -> `createdAt`
+- `thruDate` -> `closedAt`
+- `currencyUom` -> `currencyCode`
+- `presentmentCurrencyUom` -> `presentmentCurrencyCode`
+- `quantity` -> `quantity`
+- `unitListPrice` -> `originalUnitPriceSet.shopMoney.amount`
+- `unitPrice` -> `discountedUnitPriceSet.shopMoney.amount`
+- `itemDescription` -> `variant.title`
+- `originFacilityId` -> `location.legacyResourceId`
+- `shipmentMethodTypeId` -> `title`
+- `salesChannelEnumId` -> `sourceName`
+- `toName` -> `name`
+- `postalCode` -> `zip`
+- `countryCode` -> `countryCodeV2`
+- `stateProvinceGeoId` -> `provinceCode`
+- `contactNumber` -> `phone`
+- `infoString` -> `email`
+- `firstName`, `lastName`, `middleName` -> `customer.*`
+- `maxAmount` -> `amountSet.shopMoney.amount`
+- `paymentMethodTypeId` -> `gateway`
+- `textData` -> `statusPageUrl`
+- `paymentStatusId` -> `kind`
+
+### Global Value Mappings
+Common value translations are applied globally to specific OMS fields:
+- `statusId`:
+  - `ORDER_APPROVED` -> `UNFULFILLED`
+  - `ORDER_COMPLETED` -> `FULFILLED`
+  - `ORDER_CANCELLED` -> `CANCELLED`
+  - `POS_COMPLETED` -> `FULFILLED`
+- `salesChannelEnumId`:
+  - `POS_SALES_CHANNEL` -> `pos`
+  - `WEB_SALES_CHANNEL` -> `web`
+  - `PHONE_SALES_CHANNEL` -> `iphone` (or android)
+- `paymentMethodTypeId`:
+  - `EXT_SHOP_CASH` -> `cash`
+  - `EXT_SHOP_PAYPAL` -> `paypal`
+  - `EXT_SHOP_VISA` -> `Visa`
+- `shipmentMethodTypeId`:
+  - `STANDARD` -> `Standard`
+- `paymentStatusId`:
+  - `PAYMENT_AUTHORIZED` -> `authorization`
+  - `PAYMENT_SETTLED` -> `capture|sale`
+  - `PAYMENT_REFUNDED` -> `refund|void`
+
+### Value Mapping Special Logic
+The reconciliation engine supports a pipe (`|`) character in the registry to indicate multiple acceptable matches for a single OMS value. For example, `capture|sale` allows the engine to succeed if either value is found in Shopify.
+
+> [!TIP]
+> Scenarios can now have "sparse" mappings. If `shopifyField` or `valueMap` is omitted in a scenario's mapping list, the system will automatically fall back to these global defaults.
+
 ## Scenarios
 
 ### 1. Order Status (`RECL_ORD_STS`)
