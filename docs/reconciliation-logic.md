@@ -2,27 +2,22 @@
 name: Reconciliation Scenarios
 description: This file defines the comparison logic for various reconciliation scenarios between HotWax OMS and Shopify.
 scenarios:
-  - id: "RECL_ORD_STS"
-    name: "Order Status Reconciliation"
+  - id: "RECL_ORD_STS_DEMO"
+    name: "For Demo Only - Order Status Reconciliation"
     description: "Compares high-level order status and identifiers between OMS and Shopify."
     sqlPath: "orderStatus[0]"
     gqlPath: "order"
     mappings:
       - omsField: "orderName"
-        shopifyField: "name"
         label: "Order Name"
       - omsField: "externalId"
-        shopifyField: "id"
         label: "Order ID (GID)"
         transform: "stripGid"
       - omsField: "statusId"
-        shopifyField: "displayFulfillmentStatus"
         label: "Order Status"
-        valueMap:
-          "ORDER_APPROVED": "UNFULFILLED"
 
-  - id: "RECL_ORD_ITEM_STS"
-    name: "Order Item Status Reconciliation"
+  - id: "RECL_ORD_ITEM_STS_DEMO"
+    name: "For Demo Only - Order Item Status Reconciliation"
     description: "Compares item-level status and fulfillment details."
     sqlPath: "orderItemStatus"
     gqlPath: "order.lineItems.edges"
@@ -88,14 +83,30 @@ Common value translations are applied globally to specific OMS fields:
   - `ORDER_COMPLETED` -> `FULFILLED`
   - `ORDER_CANCELLED` -> `CANCELLED`
   - `POS_COMPLETED` -> `FULFILLED`
+  - `ITEM_COMPLETED` -> `FULFILLED`
+  - `ITEM_APPROVED` -> `UNFULFILLED`
 - `salesChannelEnumId`:
   - `POS_SALES_CHANNEL` -> `pos`
   - `WEB_SALES_CHANNEL` -> `web`
-  - `PHONE_SALES_CHANNEL` -> `iphone` (or android)
+  - `PHONE_SALES_CHANNEL` -> `iphone`
+  - `EXCHG_SALES_CHANNEL` -> `exchange`
+  - `CSR_SALES_CHANNEL` -> `shopify_draft_order`
+  - `LOOP_EXCH` -> `1662707`
 - `paymentMethodTypeId`:
   - `EXT_SHOP_CASH` -> `cash`
+  - `EXT_SHOP_CASH_ON_DEL` -> `Cash on Delivery (COD)`
   - `EXT_SHOP_PAYPAL` -> `paypal`
+  - `EXT_SHOP_GFT_CARD` -> `gift_card`
+  - `SHOP_STORE_CREDIT` -> `shopify_store_credit`
+  - `EXCHANGE_CREDIT` -> `exchange-credit`
+  - `EXT_SHOP_AFTRPAY` -> `afterpay`
+  - `EXT_SHOP_AFTRPAY_NA` -> `afterpay_north_america`
+  - `EXT_SHOP_PAY_INSTALL` -> `shopify_installments`
+  - `EXT_SHOP_AMEX` -> `American Express`
   - `EXT_SHOP_VISA` -> `Visa`
+  - `EXT_SHOP_MASTERCARD` -> `Mastercard`
+  - `EXT_SHOP_DISCOVER` -> `Discover`
+  - `EXT_SHOP_KLARNA` -> `Klarna`
 - `shipmentMethodTypeId`:
   - `STANDARD` -> `Standard`
 - `paymentStatusId`:
@@ -111,7 +122,7 @@ The reconciliation engine supports a pipe (`|`) character in the registry to ind
 
 ## Scenarios
 
-### 1. Order Status (`RECL_ORD_STS`)
+### 1. Order Status (`RECL_ORD_STS_DEMO`)
 This scenario validates that the basic order identity and its processing status match across both platforms.
 
 | OMS Field (SQL) | Shopify Field (GQL) | Notes |
@@ -120,7 +131,7 @@ This scenario validates that the basic order identity and its processing status 
 | `externalId` | `id` | Shopify Internal ID (GID) |
 | `statusId` | `displayFulfillmentStatus` | Current state of the order |
 
-### 2. Order Item Status (`RECL_ORD_ITEM_STS`)
+### 2. Order Item Status (`RECL_ORD_ITEM_STS_DEMO`)
 This scenario performs a list-based comparison of all line items within an order.
 
 | OMS Field (SQL) | Shopify Field (GQL) | Notes |
