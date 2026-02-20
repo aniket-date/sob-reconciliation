@@ -9,7 +9,7 @@ reconciliationScenarios.forEach(s => console.log(`- ${s.id}`));
 console.log(`Loaded scenarios in helper: ${scenarios.length}`);
 scenarios.forEach(s => console.log(`- ${s.id}`));
 
-const scenarioId = 'RECL_ORD_STS';
+const scenarioId = 'RECL_ORD_STS_DEMO';
 console.log(`\nTesting compareData for ${scenarioId}...`);
 
 const mockSql = {

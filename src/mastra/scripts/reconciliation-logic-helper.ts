@@ -1,4 +1,4 @@
-import { reconciliationScenarios, type Scenario, type Mapping } from './reconciliation-logic.js';
+import { reconciliationScenarios, globalFieldMappings, globalValueMappings, type Scenario, type Mapping } from './reconciliation-logic.js';
 
 export { Scenario, Mapping };
 
@@ -9,7 +9,6 @@ export function stripGid(gid: string): string {
     const parts = gid.split('/');
     return parts[parts.length - 1];
 }
-
 function getValue(obj: any, path: string): any {
     if (!path) return undefined;
     return path.split('.').reduce((acc, part) => {
@@ -24,15 +23,72 @@ function getValue(obj: any, path: string): any {
     }, obj);
 }
 
+/**
+ * Compares a single pair of items based on a mapping, including global fallbacks.
+ */
+function getFieldDiff(omsItem: any, shopifyItem: any, mapping: Mapping): string | null {
+    let omsVal = getValue(omsItem, mapping.omsField);
+
+    // If shopifyField is missing in mapping, check global mappings or use identity
+    let shopifyField = mapping.shopifyField;
+    if (!shopifyField) {
+        shopifyField = globalFieldMappings[mapping.omsField] || mapping.omsField;
+    }
+
+    let shopifyVal = getValue(shopifyItem, shopifyField);
+
+    // Apply transforms
+    if (mapping.transform === 'stripGid') {
+        omsVal = stripGid(omsVal);
+        shopifyVal = stripGid(shopifyVal);
+    }
+
+    // Determine the expected Shopify value based on value mappings
+    let expectedShopifyVal = omsVal; // Default to identity
+    const valueMap = mapping.valueMap || globalValueMappings[mapping.omsField];
+    if (valueMap && omsVal !== undefined && omsVal !== null && omsVal in valueMap) {
+        expectedShopifyVal = valueMap[omsVal];
+    }
+
+    // Support OR logic for expectedShopifyVal (e.g., "capture|sale")
+    if (typeof expectedShopifyVal === 'string' && expectedShopifyVal.includes('|')) {
+        const options = expectedShopifyVal.split('|').map(o => o.trim());
+        if (options.includes(shopifyVal)) {
+            return null; // Match found in one of the options
+        }
+        return `${mapping.label || mapping.omsField}: OMS(${omsVal} -> expected one of [${options.join(', ')}]) vs Shopify(${shopifyVal})`;
+    }
+
+    // Compare values, allowing for type coercion if they are string representations of the same value
+    if (omsVal != shopifyVal) { // Use loose equality for common types if needed, or stick to strict
+        // If a value mapping was applied, compare shopifyVal against the transformed expectedShopifyVal
+        if (expectedShopifyVal !== omsVal) {
+            if (shopifyVal != expectedShopifyVal) {
+                return `${mapping.label || mapping.omsField}: OMS(${omsVal} -> expected ${expectedShopifyVal}) vs Shopify(${shopifyVal})`;
+            }
+        } else {
+            // No value mapping, just direct comparison
+            return `${mapping.label || mapping.omsField}: OMS(${omsVal}) vs Shopify(${shopifyVal})`;
+        }
+    }
+    return null;
+}
+
 export function compareData(scenarioId: string, sqlData: any, gqlData: any): string {
     console.log(`[DEBUG] compareData called for scenarioId: "${scenarioId}"`);
 
     const currentScenarios = reconciliationScenarios;
-    const scenario = currentScenarios.find(s => s.id === scenarioId);
+    let scenario = currentScenarios.find(s => s.id === scenarioId);
 
+    // If scenario is not found, we create a "virtual" generic scenario
     if (!scenario) {
-        console.log(`[DEBUG] Scenario "${scenarioId}" NOT FOUND. Available IDs: ${currentScenarios.map(s => s.id).join(', ')}`);
-        return `Scenario Not Found: The scenario "${scenarioId}" was not found in the loaded configuration. Available: ${currentScenarios.map(s => s.id).join(', ')}`;
+        console.log(`[DEBUG] Scenario "${scenarioId}" NOT FOUND. Falling back to global generic mappings.`);
+        scenario = {
+            id: scenarioId,
+            name: "Generic Reconciliation",
+            description: "Automatically derived from global mappings",
+            mappings: []
+        };
     }
 
     let diffs: string[] = [];
@@ -48,25 +104,27 @@ export function compareData(scenarioId: string, sqlData: any, gqlData: any): str
         targetSql = targetSql || sqlData;
         targetGql = targetGql || gqlData;
 
-        scenario.mappings.forEach(m => {
-            let omsVal = getValue(targetSql, m.omsField);
-            let shopifyVal = getValue(targetGql, m.shopifyField);
+        // Merge Strategy: Start with all global mappings as default
+        const globalMappings: Mapping[] = Object.entries(globalFieldMappings).map(([oms, shopify]) => ({
+            omsField: oms,
+            shopifyField: shopify,
+            label: oms
+        }));
 
-            // Apply transforms
-            if (m.transform === 'stripGid') {
-                omsVal = stripGid(omsVal);
-                shopifyVal = stripGid(shopifyVal);
-            }
+        // Merge with scenario-specific mappings (scenario overrides global for the same omsField)
+        const scenarioMappings = scenario.mappings || [];
+        const mergedMappingsMap = new Map<string, Mapping>();
 
-            // Apply value mapping to OMS value
-            if (m.valueMap && omsVal in m.valueMap) {
-                console.log(`[DEBUG] Mapping value "${omsVal}" to "${m.valueMap[omsVal]}"`);
-                omsVal = m.valueMap[omsVal];
-            }
+        // Load globals first
+        globalMappings.forEach(m => mergedMappingsMap.set(m.omsField, m));
+        // Overwrite with scenario-specifics
+        scenarioMappings.forEach(m => mergedMappingsMap.set(m.omsField, m));
 
-            if (omsVal !== shopifyVal) {
-                diffs.push(`${m.label}: OMS(${omsVal}) vs Shopify(${shopifyVal})`);
-            }
+        const mappingsToUse = Array.from(mergedMappingsMap.values());
+
+        mappingsToUse.forEach(m => {
+            const diff = getFieldDiff(targetSql, targetGql, m);
+            if (diff) diffs.push(diff);
         });
     }
     // Case 2: List comparison
@@ -77,13 +135,28 @@ export function compareData(scenarioId: string, sqlData: any, gqlData: any): str
         const sqlArray = Array.isArray(sqlList) ? sqlList : [sqlList];
         const gqlArray = Array.isArray(gqlList) ? gqlList : [gqlList];
 
+        // Merge Strategy: Start with all global mappings as default
+        const globalMappings: Mapping[] = Object.entries(globalFieldMappings).map(([oms, shopify]) => ({
+            omsField: oms,
+            shopifyField: shopify,
+            label: oms
+        }));
+
+        const scenarioMappings = scenario.mappings || [];
+        const mergedMappingsMap = new Map<string, Mapping>();
+
+        globalMappings.forEach(m => mergedMappingsMap.set(m.omsField, m));
+        scenarioMappings.forEach(m => mergedMappingsMap.set(m.omsField, m));
+
+        const mappingsToUse = Array.from(mergedMappingsMap.values());
+
         sqlArray.forEach((sqlItem: any) => {
-            let omsMatchVal = getValue(sqlItem, scenario.matchBy!.oms);
-            if (scenario.matchBy!.transform === 'stripGid') omsMatchVal = stripGid(omsMatchVal);
+            let omsMatchVal = getValue(sqlItem, scenario!.matchBy!.oms);
+            if (scenario!.matchBy!.transform === 'stripGid') omsMatchVal = stripGid(omsMatchVal);
 
             const matchingGqlItem = gqlArray.find((gqlItem: any) => {
-                let gqlMatchVal = getValue(gqlItem, scenario.matchBy!.shopify);
-                if (scenario.matchBy!.transform === 'stripGid') gqlMatchVal = stripGid(gqlMatchVal);
+                let gqlMatchVal = getValue(gqlItem, scenario!.matchBy!.shopify);
+                if (scenario!.matchBy!.transform === 'stripGid') gqlMatchVal = stripGid(gqlMatchVal);
                 return omsMatchVal === gqlMatchVal;
             });
 
@@ -92,34 +165,22 @@ export function compareData(scenarioId: string, sqlData: any, gqlData: any): str
                 return;
             }
 
-            scenario.mappings.forEach(m => {
-                let omsVal = getValue(sqlItem, m.omsField);
-                let shopifyVal = getValue(matchingGqlItem, m.shopifyField);
-
-                if (m.transform === 'stripGid') {
-                    omsVal = stripGid(omsVal);
-                    shopifyVal = stripGid(shopifyVal);
-                }
-
-                // Apply value mapping
-                if (m.valueMap && omsVal in m.valueMap) {
-                    omsVal = m.valueMap[omsVal];
-                }
-
-                if (omsVal !== shopifyVal) {
-                    diffs.push(`Item ID ${omsMatchVal} - ${m.label}: OMS(${omsVal}) vs Shopify(${shopifyVal})`);
+            mappingsToUse.forEach(m => {
+                const diff = getFieldDiff(sqlItem, matchingGqlItem, m);
+                if (diff) {
+                    diffs.push(`Item ID ${omsMatchVal} - ${diff}`);
                 }
             });
         });
 
         // Check for items in Shopify but not in OMS
         gqlArray.forEach((gqlItem: any) => {
-            let gqlMatchVal = getValue(gqlItem, scenario.matchBy!.shopify);
-            if (scenario.matchBy!.transform === 'stripGid') gqlMatchVal = stripGid(gqlMatchVal);
+            let gqlMatchVal = getValue(gqlItem, scenario!.matchBy!.shopify);
+            if (scenario!.matchBy!.transform === 'stripGid') gqlMatchVal = stripGid(gqlMatchVal);
 
             const matchingSqlItem = sqlArray.find((sqlItem: any) => {
-                let omsMatchVal = getValue(sqlItem, scenario.matchBy!.oms);
-                if (scenario.matchBy!.transform === 'stripGid') omsMatchVal = stripGid(omsMatchVal);
+                let omsMatchVal = getValue(sqlItem, scenario!.matchBy!.oms);
+                if (scenario!.matchBy!.transform === 'stripGid') omsMatchVal = stripGid(omsMatchVal);
                 return omsMatchVal === gqlMatchVal;
             });
 
