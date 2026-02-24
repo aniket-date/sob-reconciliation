@@ -120,11 +120,10 @@ export function compareData(scenarioId: string, sqlData: any, gqlData: any): str
         targetSql = targetSql || sqlData;
         targetGql = targetGql || gqlData;
 
-        if (!scenario.sqlPath) {
-            if (targetSql.orderStatus && Array.isArray(targetSql.orderStatus) && targetSql.orderStatus.length > 0) {
-                targetSql = targetSql.orderStatus[0];
-            } else if (targetSql.orderSalesChannel && Array.isArray(targetSql.orderSalesChannel) && targetSql.orderSalesChannel.length > 0) {
-                targetSql = targetSql.orderSalesChannel[0];
+        if (!scenario.sqlPath && targetSql && typeof targetSql === 'object') {
+            const keys = Object.keys(targetSql);
+            if (keys.length === 1 && Array.isArray(targetSql[keys[0]]) && targetSql[keys[0]].length > 0) {
+                targetSql = targetSql[keys[0]][0];
             }
         }
         if (!scenario.gqlPath && targetGql.order) {
