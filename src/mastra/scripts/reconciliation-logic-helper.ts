@@ -43,6 +43,22 @@ function getFieldDiff(omsItem: any, shopifyItem: any, mapping: Mapping): string 
         shopifyVal = stripGid(shopifyVal);
     }
 
+    // Auto-strip Shopify GIDs
+    if (typeof shopifyVal === 'string' && shopifyVal.startsWith('gid://')) {
+        shopifyVal = stripGid(shopifyVal);
+    }
+
+    // Specifically handle the case where OMS data is missing/empty but Shopify data exists
+    if ((omsVal === null || omsVal === undefined || omsVal === '') &&
+        (shopifyVal !== null && shopifyVal !== undefined && shopifyVal !== '')) {
+        return `${mapping.label || mapping.omsField}: OMS is empty/null vs Shopify(${shopifyVal})`;
+    }
+
+    // Ignore discrepancies if Shopify data is missing/empty, even if OMS has data
+    if (shopifyVal === null || shopifyVal === undefined || shopifyVal === '') {
+        return null;
+    }
+
     // Determine the expected Shopify value based on value mappings
     let expectedShopifyVal = omsVal; // Default to identity
     const valueMap = mapping.valueMap || globalValueMappings[mapping.omsField];
@@ -58,7 +74,6 @@ function getFieldDiff(omsItem: any, shopifyItem: any, mapping: Mapping): string 
         }
         return `${mapping.label || mapping.omsField}: OMS(${omsVal} -> expected one of [${options.join(', ')}]) vs Shopify(${shopifyVal})`;
     }
-
     // Compare values, allowing for type coercion if they are string representations of the same value
     if (omsVal != shopifyVal) { // Use loose equality for common types if needed, or stick to strict
         // If a value mapping was applied, compare shopifyVal against the transformed expectedShopifyVal
@@ -101,8 +116,20 @@ export function compareData(scenarioId: string, sqlData: any, gqlData: any): str
         if (scenario.sqlPath) targetSql = getValue(sqlData, scenario.sqlPath);
         if (scenario.gqlPath) targetGql = getValue(gqlData, scenario.gqlPath);
 
+        // Target root if undefined
         targetSql = targetSql || sqlData;
         targetGql = targetGql || gqlData;
+
+        if (!scenario.sqlPath) {
+            if (targetSql.orderStatus && Array.isArray(targetSql.orderStatus) && targetSql.orderStatus.length > 0) {
+                targetSql = targetSql.orderStatus[0];
+            } else if (targetSql.orderSalesChannel && Array.isArray(targetSql.orderSalesChannel) && targetSql.orderSalesChannel.length > 0) {
+                targetSql = targetSql.orderSalesChannel[0];
+            }
+        }
+        if (!scenario.gqlPath && targetGql.order) {
+            targetGql = targetGql.order;
+        }
 
         // Merge Strategy: Start with all global mappings as default
         const globalMappings: Mapping[] = Object.entries(globalFieldMappings).map(([oms, shopify]) => ({
