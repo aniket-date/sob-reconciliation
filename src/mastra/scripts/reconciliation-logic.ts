@@ -44,7 +44,6 @@ export const globalFieldMappings: Record<string, string> = {
     "originFacilityId": "location.legacyResourceId",
     "shipmentMethodTypeId": "title",
     "salesChannelEnumId": "sourceName",
-    "toName": "name",
     "postalCode": "zip",
     "countryCode": "countryCodeV2",
     "stateProvinceGeoId": "provinceCode",
