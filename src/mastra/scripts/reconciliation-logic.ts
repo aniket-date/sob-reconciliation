@@ -48,7 +48,7 @@ export const globalFieldMappings: Record<string, string> = {
     "countryCode": "countryCodeV2",
     "stateProvinceGeoId": "provinceCode",
     "contactNumber": "phone",
-    "infoString": "email",
+    "orderEmail": "email",
     "firstName": "customer.firstName",
     "lastName": "customer.lastName",
     "middleName": "customer.middleName",

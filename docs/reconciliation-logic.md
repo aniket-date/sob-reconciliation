@@ -69,7 +69,7 @@ These map common OMS field names to their Shopify counterparts:
 - `countryCode` -> `countryCodeV2`
 - `stateProvinceGeoId` -> `provinceCode`
 - `contactNumber` -> `phone`
-- `infoString` -> `email`
+- `orderEmail` -> `email`
 - `firstName`, `lastName`, `middleName` -> `customer.*`
 - `maxAmount` -> `amountSet.shopMoney.amount`
 - `paymentMethodTypeId` -> `gateway`
