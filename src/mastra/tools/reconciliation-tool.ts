@@ -19,7 +19,7 @@ export const reconciliationTool = createTool({
 
         // Use environment variable for the instance URL, fallback to localhost if not set
         const instanceUrl = process.env.INSTANCE_URL || 'http://localhost:8080';
-        const url = `${instanceUrl}/rest/s1/sob-test/reconciliation/execute`;
+        const url = `${instanceUrl}/rest/s1/oms-test/reconciliation/execute`;
 
         console.log(`Calling reconciliation API: ${url}`);
         console.log(`Payload: `, { orderIdList, productCategoryId });
